@@ -4,8 +4,7 @@
 
   "require" : {
 
-    "catfan/medoo" : "v1.0.0",
-    "joshtronic/php-loremipsum" : "1.0.0"
+    "catfan/medoo" : "v1.0.0"
 
   },
 

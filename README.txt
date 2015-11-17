@@ -1,1 +1,2 @@
-experimental
+Flycatcher_Medoo is an extension for Medoo (http://medoo.in/). It includes more administrator-related commands such as
+table creation, and some additional management of arrays, like automatic creation of several rows.
