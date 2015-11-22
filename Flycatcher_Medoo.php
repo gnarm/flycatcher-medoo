@@ -1,13 +1,143 @@
 <?php
 
+namespace Flycatcher\Medoo;
 use Medoo;
+use Exception;
+use PDO;
 
 /**
  * @author gnarm <gnarm>
- * Flycatcher_Medoo - Medoo extension to add admin functions and relational array management
+ * Flycatcher - Medoo-extended interoperable database toolset and auto-generator.
  * @package Flycatcher
  */
 class Flycatcher_Medoo extends Medoo {
+
+	/**
+	 * Convert a Flycatcher_Medoo-specific option array into a proper SQL syntax.
+	 * @param array $options - The Flycatcher option array.
+	 * @return string
+	 */
+	private function _mapOptions(array $options) {
+
+		/*
+		 * ["type" => "VARCHAR",
+		 *  "length" => 255]
+		 */
+
+		$this->_demandOptions($options);
+
+		/* Start an empty option query.*/
+		$option_query = "";
+
+		/* Add ( and ) brackets around the length number, if specified. */
+		$length_with_brackets = isset($options["length"]) ? "(" . $options["length"] . ")" : null;
+
+		/* Construct part of the options query for type and length. */
+		$option_query .= $options["type"] . $length_with_brackets;
+
+		/* Now add other option values into $option_query, in this order. */
+		$option_query .= (isset($options["unsigned"]) && $options["unsigned"] === true) ? " UNSIGNED" : null;
+		$option_query .= (isset($options["primary_key"]) && $options["primary_key"] === true) ? " PRIMARY KEY" : null;
+		$option_query .= (isset($options["auto_increment"]) && $options["auto_increment"] === true) ? " AUTO_INCREMENT" : null;
+
+		/* Return the constructed query part. */
+		return $option_query;
+
+	}
+
+	/**
+	 * Ensure that certain options are set in the Flycatcher_Medoo array.
+	 * @param array $options - The $options array processed by the above _mapOptions() function.
+	 * @throws Exception
+	 * @return void
+	 */
+	private function _demandOptions(array $options) {
+
+		/* Make sure that "type" is set. */
+		if (!isset($options["type"])) {
+
+			throw new Exception("You must specify the \"type\" for the column! E.g. VARCHAR, INT...");
+
+		}
+
+		/* Make sure that "length" is int if set. If "length" is set and if it's not an int, throw an exception. */
+		if (isset($options["length"]) && !is_int($options["length"])) {
+
+			throw new Exception("\"length\" must be an integer!");
+
+		}
+
+	}
+
+	/**
+	 * Check if table exists from INFORMATION_SCHEMA.
+	 * @param $table_name
+	 * @return boolean
+	 */
+	public function exists($table_name) {
+
+		/* Perform an if exists SQL query, and make it print "TRUE" (anything, really) if it matches. If not, nothing
+		will be returned and it would be seen as FALSE. Check from INFORMATION_SCHEMA.TABLES. */
+		$query = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '" . $this->database_name
+		. "' AND TABLE_NAME = '" . $table_name . "'";
+
+		/* Memo: $this->exec returns the number of rows affected. $this->query returns what SQL (PDO) is meant to
+		return. */
+
+		/* As Medoo doesn't directly support a fetchAll,specific function, we'll use one here. Get fetchAll and store
+		that as $result. */
+		$result = $this->query($query)->fetchAll();
+
+		/* The number of rows affected is in index [0][0], store that as $rows. It's returned as a string, so
+		convert it as integer. */
+		$rows = (int) $result[0][0];
+
+		/* If $rows evaluates to TRUE, return TRUE. Otherwise FALSE. */
+		if ($rows) {
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+
+	}
+
+	/**
+	 * Create a table.
+	 * @param string $table_name
+	 * @param array $columns
+	 * @param array $table_options
+	 * @return PDO
+	 */
+	public function create($table_name, array $columns, array $table_options = null) {
+
+		/*
+		 * ["id" => [
+		 *      "type" => "VARCHAR"
+		 *  ]
+		 */
+
+		/* CREATE TABLE IF NOT EXISTS exampletable ( Column1 int, FirstName VARCHAR(255), LastName VARCHAR(255)) */
+		$query = "CREATE TABLE IF NOT EXISTS " . $table_name . " (";
+
+		/* Columns are jagged arrays. */
+		foreach ($columns as $column_name => $options) {
+
+			/* We need to construct the proper query string after ( to include all the desired rows as supplied in
+			$columns. $this->_mapOptions requires an array, so type cast an object into an array. */
+			$query .= $column_name . " " . $this->_mapOptions((array) $options) . ", ";
+
+		}
+
+		/* Remove the last comma and space as no further entries appear after that. */
+		$query = substr($query, 0, -2);
+
+		/* Close the rest of the query.*/
+		$query .= "); ";
+
+		/* Perform the query as exec and return the affected rows number. */
+		return $this->exec($query);
+
+	}
 
 	/**
 	 * Improved insert() function to also allow arrays in $data values.
